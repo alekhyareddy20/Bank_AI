@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BankCore Legacy System - Member Detail</title>
+</head>
+<body>
+    <table width="100%" border="0" cellpadding="10">
+        <tr>
+            <td>
+                <h2>BankCore Legacy System v2.3</h2>
+            </td>
+            <td align="right">
+                <a href="/search">Back to Search</a> |
+                <a href="/logout">Logout</a>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <table border="1" cellpadding="8" cellspacing="0" width="500">
+                    <tr>
+                        <td bgcolor="#cccccc" colspan="2" align="center">
+                            <b>MEMBER DETAILS — ID: {{ member_id }}</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><b>Full Name:</b></td>
+                        <td>{{ member.name }}</td>
+                    </tr>
+                    <tr>
+                        <td><b>Account Number:</b></td>
+                        <td>{{ member.account }}</td>
+                    </tr>
+                    <tr>
+                        <td><b>Branch:</b></td>
+                        <td>{{ member.branch }}</td>
+                    </tr>
+                    <tr>
+                        <td><b>Status:</b></td>
+                        <td>{{ member.status }}</td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#eeffee"><b>Savings Balance:</b></td>
+                        <td bgcolor="#eeffee">{{ member.savings_balance }}</td>
+                    </tr>
+                    <tr>
+                        <td><b>Checking Balance:</b></td>
+                        <td>{{ member.checking_balance }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" align="center">
+                            <a href="/transfer/{{ member_id }}">Make Transfer</a>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

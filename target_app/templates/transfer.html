@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BankCore Legacy System - Transfer</title>
+</head>
+<body>
+    <table width="100%" border="0" cellpadding="10">
+        <tr>
+            <td>
+                <h2>BankCore Legacy System v2.3</h2>
+            </td>
+            <td align="right">
+                <a href="/member/{{ member_id }}">Back to Member</a> |
+                <a href="/logout">Logout</a>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <table border="1" cellpadding="8" cellspacing="0" width="500">
+                    <tr>
+                        <td bgcolor="#ffcccc" colspan="2" align="center">
+                            <b>FUND TRANSFER — Member {{ member_id }}</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" align="center" style="color:red;">
+                            WARNING: This action is irreversible and cannot be undone.
+                        </td>
+                    </tr>
+
+                    <form method="POST" action="/transfer/{{ member_id }}">
+                    <tr>
+                        <td>Transfer Amount:</td>
+                        <td><input type="text" name="amount" placeholder="e.g. 500.00"></td>
+                    </tr>
+                    <tr>
+                        <td>Destination Account:</td>
+                        <td><input type="text" name="destination" placeholder="Account number"></td>
+                    </tr>
+                    <tr>
+                        <td>Reason:</td>
+                        <td><input type="text" name="reason" placeholder="Transfer reason"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" align="center">
+                            <input type="submit" value="Submit Transfer">
+                        </td>
+                    </tr>
+                    </form>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

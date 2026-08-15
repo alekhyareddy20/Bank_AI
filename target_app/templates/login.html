@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BankCore Legacy System - Login</title>
+</head>
+<body>
+    <table width="100%" border="0" cellpadding="10">
+        <tr>
+            <td align="center">
+                <h2>BankCore Legacy System v2.3</h2>
+                <p>Authorized Personnel Only</p>
+            </td>
+        </tr>
+        <tr>
+            <td align="center">
+                <table border="1" cellpadding="8" cellspacing="0" width="350">
+                    <tr>
+                        <td bgcolor="#cccccc" colspan="2" align="center">
+                            <b>OPERATOR LOGIN</b>
+                        </td>
+                    </tr>
+
+                    {% if error %}
+                    <tr>
+                        <td colspan="2" align="center" style="color:red;">
+                            {{ error }}
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <form method="POST" action="/">
+                    <tr>
+                        <td>Username:</td>
+                        <td><input type="text" name="username" placeholder="Username"></td>
+                    </tr>
+                    <tr>
+                        <td>Password:</td>
+                        <td><input type="password" name="password" placeholder="Password"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" align="center">
+                            <input type="submit" value="Login">
+                        </td>
+                    </tr>
+                    </form>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
