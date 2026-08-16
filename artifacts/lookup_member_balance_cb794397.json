@@ -38,13 +38,22 @@
       "reasoning": "Logged in successfully. Now I need to search for member 12345 by entering '12345' into the Member ID input field.",
       "action": "type",
       "element": "Member ID input field",
-      "value": "12345",
+      "value": "{{member_id}}",
       "is_done": false
     },
     {
       "reasoning": "Member ID 12345 has been typed into the input field. Now I need to click the 'Search Member' button to search for the member's details.",
       "action": "click",
       "element": "Search Member button",
+      "value": null,
+      "is_done": false
+    }
+    ,
+    {
+      "step_id": 5,
+      "reasoning": "Read the savings balance from the member detail page",
+      "action": "read",
+      "element": "Savings Balance value",
       "value": null,
       "is_done": false
     }

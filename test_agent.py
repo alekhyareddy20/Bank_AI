@@ -130,7 +130,12 @@ with sync_playwright() as p:
             break
 
         execute_action(page, action)
-        steps_done.append(action)
+        #steps_done.append(action)
+        # Replace actual member_id value with placeholder before saving
+        step_to_save = action.copy()
+        if step_to_save.get("value") == "12345":
+            step_to_save["value"] = "{{member_id}}"
+        steps_done.append(step_to_save)
 
     page.wait_for_timeout(3000)
     browser.close()
