@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from playwright.sync_api import sync_playwright
+from agent_artifact import create_artifact
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -113,8 +114,19 @@ with sync_playwright() as p:
         print(f"  Gemini: {action['reasoning'][:80]}")
         print(f"  Action: {action['action']} → {action['element']}")
 
+        # if action.get("is_done"):
+        #     print("\n✅ GOAL COMPLETE!")
+        #     break
         if action.get("is_done"):
             print("\n✅ GOAL COMPLETE!")
+            # Save everything as an artifact
+            create_artifact(
+                capability_name="lookup_member_balance",
+                description="Log in and look up a member savings balance",
+                goal=goal,
+                steps=steps_done,
+                extracted_data={"savings_balance": "extracted from page"}
+            )
             break
 
         execute_action(page, action)
