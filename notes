@@ -9,3 +9,39 @@
 ⏳ Phase 8 — Human handoff
 ⏳ Phase 9 — Tests
 ⏳ Phase 10 — Submission
+
+Screenshot → llama-4-scout (describes: "I see a login form...")
+Description → gpt-oss-20b (decides: {"action": "type", "element": "Username"...})
+
+
+Groq now has vision models (can see screenshots) and they're extremely fast. Plus I'll add the two-model setup you asked about.
+
+ plan:
+
+Single model option: Groq + llama-4-scout → fast AND sees screenshots, free
+Two-model option: Vision model describes the screen → Fast model decides what to do (best of both worlds)
+Created 2 files, ran 2 commands, edited a file · 1 note
+
+Both files are clean. Here's what changed and what to do now:
+
+What was added to llm_provider.py:
+
+GroqProvider now auto-detects vision models and sends the screenshot as an image — so llama-4-scout can literally see your page, same as Gemini, but much faster and no 503 errors.
+
+TwoModelProvider is brand new — it chains two models:
+
+Screenshot → llama-4-scout (describes: "I see a login form...")
+Description → gpt-oss-20b (decides: {"action": "type", "element": "Username"...})
+
+Update your .env file — :
+
+LLM_PROVIDER=groq
+LLM_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+
+Or for the two-model setup :
+
+LLM_PROVIDER=two_model
+VISION_PROVIDER=groq
+VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+DECISION_PROVIDER=groq
+DECISION_MODEL=openai/gpt-oss-20b
