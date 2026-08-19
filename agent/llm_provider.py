@@ -17,6 +17,11 @@ class BaseLLMProvider(ABC):
 
     def _clean_json(self, raw_text):
         text = raw_text.strip()
+
+        # Strip <think>...</think> blocks (qwen and some models reason out loud)
+        import re
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
         if text.startswith("```"):
             lines = text.split("\n")
             text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
@@ -35,14 +40,14 @@ class BaseLLMProvider(ABC):
 
 
 class GroqProvider(BaseLLMProvider):
-    DEFAULT_MODEL = "llama-3.2-11b-vision-preview"
+    DEFAULT_MODEL = "openai/gpt-oss-20b"
     API_URL       = "https://api.groq.com/openai/v1/chat/completions"
     VISION_MODELS = {
-    "llama-3.2-11b-vision-preview",
-    "llama-3.2-90b-vision-preview",
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
-}
+        "llama-3.2-11b-vision-preview",
+        "llama-3.2-90b-vision-preview",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+    }
 
     def __init__(self, model=None):
         super().__init__(model or self.DEFAULT_MODEL)
@@ -124,38 +129,185 @@ class HuggingFaceProvider(BaseLLMProvider):
 
 
 class TwoModelProvider(BaseLLMProvider):
-    DESCRIBE_PROMPT = """You are a screen reader for an AI agent.
-Describe: 1) what page is shown, 2) visible form fields and buttons, 3) important text.
-Be brief. Example: "Login page. Username field, Password field, Login button."
-"""
+    """
+    Two-model setup — both on Groq (no vision needed):
+      Analyzer: qwen/qwen3.6-27b      — smarter, reads page and describes state
+      Decider:  openai/gpt-oss-20b    — fastest, reads description and picks action
+
+    .env:
+        LLM_PROVIDER=two_model
+        VISION_PROVIDER=groq
+        VISION_MODEL=qwen/qwen3.6-27b
+        DECISION_PROVIDER=groq
+        DECISION_MODEL=openai/gpt-oss-20b
+    """
+
+    ANALYZE_PROMPT = """You are a web page analyzer for an AI agent.
+Read the page text and describe the current state.
+
+Reply with ONLY this JSON (no markdown):
+{
+  "current_page": "login | member_search | member_details | transfer | other",
+  "description": "one sentence — what page is shown",
+  "visible_fields": "input fields visible e.g. Username, Password, Member ID",
+  "visible_buttons": "buttons visible e.g. Login, Search Member",
+  "key_data": "important data e.g. Member: Alice Johnson, Savings: $5432.10 — or empty string"
+}"""
+
     def __init__(self):
         super().__init__(model="two-model")
-        _map = {"groq": GroqProvider, "gemini": GeminiProvider, "huggingface": HuggingFaceProvider, "hf": HuggingFaceProvider}
-        vision_provider   = os.getenv("VISION_PROVIDER", "groq").lower()
-        vision_model      = os.getenv("VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
-        decision_provider = os.getenv("DECISION_PROVIDER", "groq").lower()
-        decision_model    = os.getenv("DECISION_MODEL", "openai/gpt-oss-20b")
-        print(f"  ✓ Two-model: vision={vision_provider}/{vision_model}, decision={decision_provider}/{decision_model}")
-        self.vision   = _map[vision_provider](model=vision_model)
-        self.decision = _map[decision_provider](model=decision_model)
+        _map = {
+            "groq":        GroqProvider,
+            "gemini":      GeminiProvider,
+            "huggingface": HuggingFaceProvider,
+            "hf":          HuggingFaceProvider,
+        }
+        analyzer_provider = os.getenv("VISION_PROVIDER",   "groq").lower()
+        analyzer_model    = os.getenv("VISION_MODEL",       "qwen/qwen3.6-27b")
+        decider_provider  = os.getenv("DECISION_PROVIDER",  "groq").lower()
+        decider_model     = os.getenv("DECISION_MODEL",     "openai/gpt-oss-20b")
+
+        print(f"  ✓ Two-model setup:")
+        print(f"    Analyzer: {analyzer_provider} / {analyzer_model}")
+        self.analyzer = _map[analyzer_provider](model=analyzer_model)
+        print(f"    Decider:  {decider_provider} / {decider_model}")
+        self.decider  = _map[decider_provider](model=decider_model)
 
     def ask(self, screenshot_b64, page_text, system_prompt, user_prompt):
+        import time
+
+        # ── Step 1: Analyzer reads page and describes state ───────────────────
+        t1 = time.time()
         try:
-            desc = self.vision.ask(screenshot_b64, page_text, self.DESCRIBE_PROMPT, "Describe this screen.")
-            description = desc.get("description", str(desc)) if isinstance(desc, dict) else str(desc)
+            analysis = self.analyzer.ask(
+                screenshot_b64=screenshot_b64,
+                page_text=page_text,
+                system_prompt=self.ANALYZE_PROMPT,
+                user_prompt=f"Analyze this page:\n{page_text[:1000]}",
+            )
+            if isinstance(analysis, dict):
+                description = (
+                    f"Page: {analysis.get('current_page','?')} | "
+                    f"{analysis.get('description','')} | "
+                    f"Fields: {analysis.get('visible_fields','')} | "
+                    f"Buttons: {analysis.get('visible_buttons','')} | "
+                    f"Data: {analysis.get('key_data','')}"
+                )
+            else:
+                description = str(analysis)
         except Exception as e:
-            description = f"(vision failed: {e})\n{page_text[:400]}"
-        enriched = f"{user_prompt}\n\nSCREEN: {description}\n\nPAGE TEXT: {page_text[:600]}"
-        return self.decision.ask("", page_text, system_prompt, enriched)
+            description = f"(analysis failed: {e}) | raw: {page_text[:300]}"
+
+        t2 = time.time()
+        print(f"    [analyzer {t2-t1:.2f}s] {description[:90]}")
+
+        # ── Step 2: Decider reads analysis and picks next action ──────────────
+        enriched_prompt = f"""{user_prompt}
+
+PAGE ANALYSIS (from analyzer):
+{description}
+
+RAW PAGE TEXT:
+{page_text[:600]}
+"""
+        t3 = time.time()
+        result = self.decider.ask(
+            screenshot_b64="",
+            page_text=page_text,
+            system_prompt=system_prompt,
+            user_prompt=enriched_prompt,
+        )
+        t4 = time.time()
+        print(f"    [decider  {t4-t3:.2f}s]")
+        return result
 
 
 def create_llm_provider():
     """Read LLM_PROVIDER from .env and return the right provider."""
     name  = os.getenv("LLM_PROVIDER", "groq").lower()
     model = os.getenv("LLM_MODEL", None)
+
     if name in ("two_model", "two-model"):
         return TwoModelProvider()
-    providers = {"groq": GroqProvider, "gemini": GeminiProvider, "huggingface": HuggingFaceProvider, "hf": HuggingFaceProvider}
+
+    providers = {
+        "groq":        GroqProvider,
+        "gemini":      GeminiProvider,
+        "huggingface": HuggingFaceProvider,
+        "hf":          HuggingFaceProvider,
+    }
     if name not in providers:
         raise ValueError(f"Unknown LLM_PROVIDER '{name}'. Choose: {list(providers.keys()) + ['two_model']}")
     return providers[name](model=model)
+
+# OPERATOR LOGIN
+# Usernam...
+#   Asking LLM...     [analyzer 2.20s] (analysis failed: Could not parse JSON.
+# Raw: <think>
+# Thinking Process:
+# 1.  **Analyze User 
+#     [decider  0.57s]
+# done
+#   Reasoning: After entering the username and password, the next step is to submit the lo
+#   Action:    click → Login button
+#   Result:    Clicked 'Login button'
+# ───────────────────────────────────────────────────────
+#   Step 4/12
+#   Page: BankCore Legacy System v2.3
+#         Logout
+
+# MEMBER SEARCH
+# Member ID:...
+#   Asking LLM...     [analyzer 2.13s] (analysis failed: Could not parse JSON.
+# Raw: <think>
+# Thinking Process:
+# 1.  **Analyze User 
+#     [decider  0.47s]
+# done
+#   Reasoning: After logging in, the user is on the Member Search page. The next step is t
+#   Action:    type → Member ID field
+#   Result:    Typed '12345' into 'Member ID field'
+# ───────────────────────────────────────────────────────
+#   Step 5/12
+#   Page: BankCore Legacy System v2.3
+#         Logout
+
+# MEMBER SEARCH
+# Member ID:...
+#   Asking LLM...     [analyzer 0.16s] (analysis failed: Groq error 429: {"error":{"message":"Rate limit reached for model `qwen/
+#     [decider  0.49s]
+# done
+#   Reasoning: After entering the member ID, the next step is to submit the search query b
+#   Action:    click → Search button next to Member ID field
+#   Result:    Clicked 'Search button next to MemberID field'
+# ───────────────────────────────────────────────────────
+#   Step 6/12
+#   Page: BankCore Legacy System v2.3
+#         Back to Search | Logout
+
+# MEMBER DETAILS — ID: 12345...
+#   Asking LLM...     [analyzer 0.17s] (analysis failed: Groq error 429: {"error":{"message":"Rate limit reached for model `qwen/
+#     [decider  0.41s]
+# done
+#   Reasoning: After searching for member 12345, themember details page is displayed. The
+#   Action:    read → Savings Balance field
+#   Result:    Read page (232 chars)
+# ───────────────────────────────────────────────────────
+#   Step 7/12
+#   Page: BankCore Legacy System v2.3
+#         Back to Search | Logout
+
+# MEMBER DETAILS — ID: 12345...
+#   Asking LLM...     [analyzer 0.13s] (analysis failed: Groq error 429: {"error":{"message":"Rate limit reached for model `qwen/
+#     [decider  0.61s]
+# done
+#   Reasoning: All steps to log in, search for member 12345, and read the savings balance 
+#   Action:    done → None
+
+#   ✅ GOAL COMPLETE!
+#   Extracted: {'savings_balance': '$5,432.10'}
+
+# ═══════════════════════════════════════════════════════
+#   Steps taken: 6
+#   savings_balance: $5,432.10
+# ═══════════════════════════════════════════════════════
