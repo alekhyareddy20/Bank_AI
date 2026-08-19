@@ -63,29 +63,166 @@ Bank_AI/
 
 ---
 
-## Quick Start
+## How to Run — Step by Step
+
+### Step 1 — Install dependencies
 
 ```bash
-# 1. Install dependencies
 pip install -r requirements.txt
 playwright install chromium
+```
 
-# 2. Set up your API keys
-cp .env.example .env
-# Edit .env — add your GROQ_API_KEY (free at https://console.groq.com)
+---
 
-# 3. Start the fake bank (Terminal 1)
+### Step 2 — Get a free Groq API key
+
+1. Go to **https://console.groq.com**
+2. Sign up (free, no credit card)
+3. Click **API Keys → Create API Key**
+4. Copy the key
+
+---
+
+### Step 3 — Create your `.env` file
+
+In the `Bank_AI/` folder, create a file called `.env` with this content:
+
+```
+LLM_PROVIDER=two_model
+VISION_PROVIDER=groq
+VISION_MODEL=openai/gpt-oss-120b
+DECISION_PROVIDER=groq
+DECISION_MODEL=openai/gpt-oss-20b
+GROQ_API_KEY=paste_your_groq_key_here
+```
+
+> **Note:** Never commit `.env` to Git — it contains your secret API key.
+
+---
+
+### Step 4 — Start the fake bank
+
+Open **Terminal 1** and run:
+
+```bash
+python main.py bank
+```
+
+You should see:
+```
+▶ Starting Fake Bank App
+  Open: http://localhost:5000
+  Login: admin / password123
+```
+
+Leave this terminal running. Open the bank in your browser at `http://127.0.0.1:5000` to see it.
+
+---
+
+### Step 5 — Run the AI agent
+
+Open **Terminal 2** (keep Terminal 1 running) and run:
+
+```bash
+python test_agent.py
+```
+
+A Chrome browser window will open automatically. Watch the agent log in, search for member 12345, and read the savings balance. You will see output like:
+
+```
+═══════════════════════════════════════════════════════
+  COMPUTER USE AGENT
+═══════════════════════════════════════════════════════
+  Goal: Log in with username admin and password password123...
+
+  ✓ Two-model setup:
+    Analyzer: groq / openai/gpt-oss-120b
+    Decider:  groq / openai/gpt-oss-20b
+
+  Browser opened → http://127.0.0.1:5000
+
+  Step 1/12
+    [analyzer 0.79s] Page: login | Operator login page | Fields: Username, Password
+    [decider  0.55s]
+  Action: type → Username field
+  Result: Typed 'admin' into 'Username field'
+
+  Step 2/12 ...
+  Step 3/12 ...
+  ...
+
+  ✅ GOAL COMPLETE!
+  Extracted: {'savings_balance': '$5,432.10'}
+═══════════════════════════════════════════════════════
+  savings_balance: $5,432.10
+═══════════════════════════════════════════════════════
+```
+
+Screenshots of each step are saved to the `evidence/` folder.
+
+---
+
+### Step 6 — Replay without AI
+
+Once the agent has run once and saved an artifact, you can replay it for any member — no AI calls, no API key needed:
+
+```bash
+# Member 12345 — Alice Johnson ($5,432.10)
+python main.py replay artifacts/lookup_member_balance_*.json member_id=12345
+
+# Member 67890 — Bob Smith ($12,750.50)
+python main.py replay artifacts/lookup_member_balance_*.json member_id=67890
+
+# Member 99999 — does not exist (tests the "not found" path)
+python main.py replay artifacts/lookup_member_balance_*.json member_id=99999
+
+# Member 11111 — Carol's account is frozen (tests the business outcome path)
+python main.py replay artifacts/lookup_member_balance_*.json member_id=11111
+```
+
+---
+
+### Step 7 — Run all tests
+
+```bash
+python tests.py
+```
+
+Expected output:
+```
+Ran 18 tests in 3.4s
+OK
+```
+
+---
+
+### Switching to single-model mode (faster, simpler)
+
+If you want the fastest possible run, switch `.env` to single model:
+
+```
+LLM_PROVIDER=groq
+LLM_MODEL=openai/gpt-oss-20b
+GROQ_API_KEY=paste_your_groq_key_here
+```
+
+This completes the same task in ~0.75s per step with no analyzer overhead.
+
+---
+
+### Quick Start (short version)
+
+```bash
+pip install -r requirements.txt
+playwright install chromium
+cp .env.example .env          # then edit .env and add your GROQ_API_KEY
+
+# Terminal 1
 python main.py bank
 
-# 4. Run the AI agent (Terminal 2)
+# Terminal 2
 python test_agent.py
-
-# 5. Replay the saved artifact
 python main.py replay artifacts/lookup_member_balance_*.json member_id=12345
-python main.py replay artifacts/lookup_member_balance_*.json member_id=67890
-python main.py replay artifacts/lookup_member_balance_*.json member_id=99999  # not found
-
-# 6. Run all tests
 python tests.py
 ```
 
