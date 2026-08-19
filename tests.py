@@ -28,7 +28,7 @@ print("="*50 + "\n")
 
 # ── TEST 1: GUARDRAILS ────────────────────────────────────────
 print("--- Guardrails ---")
-from guardrails import check_url, check_action, check_risky_page, redact_sensitive
+from agent.guardrails import check_url, check_action, check_risky_page, redact_sensitive
 
 # Allowed URL passes
 try:
@@ -103,7 +103,7 @@ test("Artifact has member_id placeholder",
 
 # ── TEST 4: ESCALATION ────────────────────────────────────────
 print("\n--- Escalation ---")
-from escalation import request_intervention, resolve_intervention, list_pending
+from agent.escalation import request_intervention, resolve_intervention, list_pending
 
 filepath = request_intervention(
     reason="Test intervention",

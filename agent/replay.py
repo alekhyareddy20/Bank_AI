@@ -5,9 +5,8 @@
 import json
 import os
 from playwright.sync_api import sync_playwright
-from guardrails import check_url, check_action, check_risky_page, safe_log_step
+from agent.guardrails import check_url, check_action, check_risky_page, safe_log_step
 
-# ── KNOWN ERROR PATTERNS ──────────────────────────────────────
 BUSINESS_OUTCOMES = [
     "No record found",
     "Member not found",
@@ -54,8 +53,11 @@ def replay(artifact_path, input_params={}):
 
         for i, step in enumerate(artifact["steps"]):
             step_id = step.get("step_id", i)
-            action = step.get("action", "")
-            element = step.get("element", "")
+
+            # Support both old format (action/element) and new Pydantic format (action_type/locator)
+            action  = step.get("action_type") or step.get("action", "")
+            locator = step.get("locator") or {}
+            element = locator.get("description") or locator.get("value") or step.get("element", "")
 
             # Replace {{member_id}} with real value
             value = step.get("value")
@@ -84,11 +86,15 @@ def replay(artifact_path, input_params={}):
                 final_status = "hard_failure"
                 break
 
-            # ── LOG STEP (hides sensitive values) ──────────────
+            # ── LOG STEP ───────────────────────────────────────
             safe_log_step(element, value)
 
             try:
-                if action == "type":
+                if action == "navigate":
+                    page.goto(step.get("url", artifact["target_url"]))
+                    page.wait_for_timeout(800)
+
+                elif action == "type":
                     if "username" in element.lower():
                         page.get_by_placeholder("Username").fill(value)
                     elif "password" in element.lower():
@@ -104,13 +110,11 @@ def replay(artifact_path, input_params={}):
                         page.get_by_role("button", name="Search Member").click()
                     page.wait_for_timeout(1000)
 
-                    # ── CHECK PAGE AFTER EVERY CLICK ──────────────
                     page_text = page.inner_text("body")
                     status, message = check_page_for_errors(page_text)
 
                     if status == "business_outcome":
                         print(f"\n⚠️  BUSINESS OUTCOME: {message}")
-                        print(f"   This is a valid result — not a crash")
                         final_status = "business_outcome"
                         results["outcome"] = message
                         browser.close()
@@ -159,40 +163,6 @@ if __name__ == "__main__":
     print("TEST 1: Valid member 67890")
     replay(f"artifacts/{latest}", input_params={"member_id": "67890"})
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("TEST 2: Missing member 99999")
     replay(f"artifacts/{latest}", input_params={"member_id": "99999"})
-
-
-
-# # 
-# 📂 Loading artifact: artifacts/lookup_member_balance_cb794397.json
-#    Capability: lookup_member_balance
-#    Steps to replay: 6
-#    Input params: {'member_id': '67890'}
-
-#    Step 1: type → Username input field
-#             value: admin
-#    ✓ Done
-
-#    Step 2: type → Password input field
-#             value: password123
-#    ✓ Done
-
-#    Step 3: click → Login button
-#    ✓ Done
-
-#    Step 4: type → Member ID input field
-#             value: 67890
-#    ✓ Done
-
-#    Step 5: click → Search Member button
-#    ✓ Done
-
-#    Step 6: read → Savings Balance value
-#             extracted: MEMBER DETAILS — ID: 67890
-#             extracted: $12,750.50
-#    ✓ Done
-
-# ✅ REPLAY COMPLETE
-#    Results: {'savings_balance': '$12,750.50'}

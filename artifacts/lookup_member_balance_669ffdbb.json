@@ -1,0 +1,143 @@
+{
+  "id": "669ffdbb",
+  "version": "1.0",
+  "capability_name": "lookup_member_balance",
+  "description": "Log in to the bank and look up a member's savings balance",
+  "target_url": "http://127.0.0.1:5000",
+  "input_params": {
+    "member_id": "string"
+  },
+  "output_schema": {
+    "savings_balance": "string"
+  },
+  "steps": [
+    {
+      "step_id": 0,
+      "description": "Navigate to the bank login page",
+      "action_type": "navigate",
+      "locator": null,
+      "fallback_locators": [],
+      "url": "http://127.0.0.1:5000",
+      "value": null,
+      "extract_as": null,
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    },
+    {
+      "step_id": 1,
+      "description": "Typed 'admin' into 'Username field'",
+      "action_type": "type",
+      "locator": {
+        "strategy": "text",
+        "value": "Username field",
+        "description": "Username field"
+      },
+      "fallback_locators": [],
+      "url": null,
+      "value": "admin",
+      "extract_as": null,
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    },
+    {
+      "step_id": 2,
+      "description": "Typed 'password123' into 'Password field'",
+      "action_type": "type",
+      "locator": {
+        "strategy": "text",
+        "value": "Password field",
+        "description": "Password field"
+      },
+      "fallback_locators": [],
+      "url": null,
+      "value": "password123",
+      "extract_as": null,
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    },
+    {
+      "step_id": 3,
+      "description": "Clicked 'Login button'",
+      "action_type": "click",
+      "locator": {
+        "strategy": "text",
+        "value": "Login button",
+        "description": "Login button"
+      },
+      "fallback_locators": [],
+      "url": null,
+      "value": null,
+      "extract_as": null,
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    },
+    {
+      "step_id": 4,
+      "description": "Typed '12345' into 'Member ID field'",
+      "action_type": "type",
+      "locator": {
+        "strategy": "text",
+        "value": "Member ID field",
+        "description": "Member ID field"
+      },
+      "fallback_locators": [],
+      "url": null,
+      "value": "12345",
+      "extract_as": null,
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    },
+    {
+      "step_id": 5,
+      "description": "Clicked 'Search button'",
+      "action_type": "click",
+      "locator": {
+        "strategy": "text",
+        "value": "Search button",
+        "description": "Search button"
+      },
+      "fallback_locators": [],
+      "url": null,
+      "value": null,
+      "extract_as": null,
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    },
+    {
+      "step_id": 6,
+      "description": "Read page (232 chars)",
+      "action_type": "read",
+      "locator": {
+        "strategy": "text",
+        "value": "Savings Balance",
+        "description": "Savings Balance"
+      },
+      "fallback_locators": [],
+      "url": null,
+      "value": null,
+      "extract_as": "savings_balance",
+      "wait_for": null,
+      "checkpoint_text": null,
+      "risk_level": "safe",
+      "wait_after_ms": 500
+    }
+  ],
+  "success_condition": "Savings Balance",
+  "created_at": "2026-08-19T03:49:21.308691",
+  "created_by": "discovery-agent",
+  "allowed_domains": [
+    "127.0.0.1"
+  ]
+}

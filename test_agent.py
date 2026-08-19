@@ -3,19 +3,24 @@
 
 import os
 import sys
-import re
 import base64
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
-# Tell Python where to find the agent folder
+# ── CRITICAL: tell Python where to find llm_provider.py ──────────────────────
 _here = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, _here)
-sys.path.insert(0, os.path.join(_here, "agent"))
+sys.path.insert(0, _here)                          # adds Bank_AI/
+sys.path.insert(0, os.path.join(_here, "agent"))   # adds Bank_AI/agent/
 
 load_dotenv()
 
 from llm_provider import create_llm_provider
+
+# ── Import artifact classes via the agent package ─────────────────────────────
+import agent.artifact as _art_mod
+Artifact   = _art_mod.Artifact
+ActionStep = _art_mod.ActionStep
+Locator    = _art_mod.Locator
 
 # ─────────────────────────────────────────────────────────────────────────────
 BANK_URL  = "http://127.0.0.1:5000"
@@ -68,12 +73,9 @@ def execute_action(page, action):
         if not filled:
             try:
                 page.locator("input:visible").first.fill(value)
-                filled = True
             except Exception as e:
                 return f"TYPE FAILED: {e}"
-        if filled:
-            return f"Typed '{value}' into '{element}'"
-        return f"TYPE FAILED: could not find input for '{element}'"
+        return f"Typed '{value}' into '{element}'"
 
     elif act == "click":
         clicked = False
@@ -92,18 +94,16 @@ def execute_action(page, action):
             except Exception:
                 pass
 
-        # Strategy 2: click by partial text
+        # Strategy 2: click any visible element containing that text
         if not clicked:
             try:
-                page.locator("button, input[type=submit], a").filter(
-                    has_text=element.split()[0]
-                ).first.click()
+                page.locator(f"button, input[type=submit], a").filter(has_text=element.split()[0]).first.click()
                 page.wait_for_timeout(1200)
                 clicked = True
             except Exception:
                 pass
 
-        # Strategy 3: fallback click by visible text
+        # Strategy 3: click by full text match
         if not clicked:
             try:
                 page.get_by_text(element, exact=False).first.click()
@@ -174,21 +174,23 @@ What is the next single action? Reply ONLY with valid JSON.
             )
 
             print("done")
-            print(f"  Reasoning: {str(action.get('reasoning', '?'))[:75]}")
-            print(f"  Action:    {action.get('action')} → {action.get('element', '')}")
+            print(f"  Reasoning: {str(action.get('reasoning','?'))[:75]}")
+            print(f"  Action:    {action.get('action')} → {action.get('element','')}")
 
             if action.get("is_done"):
                 final_result = action.get("extracted_data") or {}
+
                 # If LLM forgot to fill extracted_data, scan page text for the balance
                 if not final_result:
+                    import re
                     balance_match = re.search(r'\$[\d,]+\.\d{2}', page_text)
                     if balance_match:
                         final_result = {"savings_balance": balance_match.group(0)}
+
                 print(f"\n  ✅ GOAL COMPLETE!")
                 print(f"  Extracted: {final_result}")
                 break
 
-            # ← THIS LINE WAS MISSING — execute the action first, then record it
             result = execute_action(page, action)
             print(f"  Result:    {result}")
 
@@ -208,6 +210,55 @@ What is the next single action? Reply ONLY with valid JSON.
         page.wait_for_timeout(3000)
         browser.close()
 
+    # ── SAVE ARTIFACT ────────────────────────────────────────────────────────
+    if final_result:
+        # Build the steps list — starts with navigate, then all recorded steps
+        artifact_steps = [
+            ActionStep(
+                step_id=0,
+                description="Navigate to the bank login page",
+                action_type="navigate",
+                url=BANK_URL,
+                locator=None,
+            )
+        ]
+
+        action_type_map = {"type": "type", "click": "click", "read": "read"}
+
+        for i, s in enumerate(steps_done):
+            act = s.get("action", "")
+            if act not in action_type_map:
+                continue   # skip "done" and unknowns
+
+            artifact_steps.append(ActionStep(
+                step_id=i + 1,
+                description=s.get("result", f"{act} {s.get('element','')}"),
+                action_type=action_type_map[act],
+                locator=Locator(
+                    strategy="text",
+                    value=s.get("element", ""),
+                    description=s.get("element", ""),
+                ),
+                value=s.get("value"),                          # {{member_id}} already substituted above
+                extract_as="savings_balance" if act == "read" else None,
+                risk_level="safe",
+            ))
+
+        artifact = Artifact(
+            capability_name="lookup_member_balance",
+            description="Log in to the bank and look up a member's savings balance",
+            target_url=BANK_URL,
+            input_params={"member_id": "string"},
+            output_schema={"savings_balance": "string"},
+            steps=artifact_steps,
+            success_condition="Savings Balance",
+            allowed_domains=["127.0.0.1"],
+        )
+
+        artifact_path = artifact.save("artifacts")
+        print(f"\n  💾 Artifact saved → {artifact_path}")
+
+    # ── FINAL SUMMARY ────────────────────────────────────────────────────────
     print("\n" + "═"*55)
     print(f"  Steps taken: {len(steps_done)}")
     if final_result:
